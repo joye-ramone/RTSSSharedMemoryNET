@@ -2,7 +2,7 @@
 
 #include "stdafx.h"
 
-#include "OSD.h"
+#include "Osd.h"
 
 #define TICKS_PER_MICROSECOND 10
 #define RTSS_VERSION(x, y) ((x << 16) + y)
@@ -36,8 +36,6 @@ namespace RTSSSharedMemoryNET {
         if( m_disposed )
             return;
 
-        
-
         //delete managed, if any
 
         this->!OSD();
@@ -56,7 +54,7 @@ namespace RTSSSharedMemoryNET {
             //calc offset of entry
             auto pEntry = (RTSS_SHARED_MEMORY::LPRTSS_SHARED_MEMORY_OSD_ENTRY)( (LPBYTE)pMem + pMem->dwOSDArrOffset + (i * pMem->dwOSDEntrySize) );
 
-            if( STRMATCHES(strcmp(pEntry->szOSDOwner, m_entryName)) )
+            if( strcmp(pEntry->szOSDOwner, m_entryName) == 0 )
             {
                 SecureZeroMemory(pEntry, pMem->dwOSDEntrySize); //won't get optimized away
                 pMem->dwOSDFrame++; //forces OSD update
@@ -108,7 +106,7 @@ namespace RTSSSharedMemoryNET {
             }
 
             //if this is our slot
-            if( STRMATCHES(strcmp(pEntry->szOSDOwner, m_entryName)) )
+            if( strcmp(pEntry->szOSDOwner, m_entryName) == 0 )
             {
                 //use extended text slot for v2.7 and higher shared memory, it allows displaying 4096 symbols instead of 256 for regular text slot
                 if( pMem->dwVersion >= RTSS_VERSION(2,7) )
@@ -198,12 +196,14 @@ namespace RTSSSharedMemoryNET {
                 entry->StatFramerateMin = pEntry->dwStatFramerateMin;
                 entry->StatFramerateAvg = pEntry->dwStatFramerateAvg;
                 entry->StatFramerateMax = pEntry->dwStatFramerateMax;
+
                 if( pMem->dwVersion >= RTSS_VERSION(2,5) )
                 {
                     entry->StatFrameTimeMin = pEntry->dwStatFrameTimeMin;
                     entry->StatFrameTimeAvg = pEntry->dwStatFrameTimeAvg;
                     entry->StatFrameTimeMax = pEntry->dwStatFrameTimeMax;
                     entry->StatFrameTimeCount = pEntry->dwStatFrameTimeCount;
+
                     //TODO - frametime buffer?
                 }
 
@@ -296,7 +296,6 @@ namespace RTSSSharedMemoryNET {
 
         if( hMapFile )
             CloseHandle(hMapFile);
-
     }
 
     DateTime OSD::timeFromTickcount(DWORD ticks)

@@ -1,6 +1,8 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2012
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.1082
+MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RTSSSharedMemoryNET", "RTSSSharedMemoryNET\RTSSSharedMemoryNET.vcxproj", "{53939D64-D853-4B4C-A4F9-2FCE48502725}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RTSSDemo", "RTSSDemo\RTSSDemo.csproj", "{2D164B3F-2CC0-4F43-A89D-1199AA2B4EFC}"
@@ -8,7 +10,6 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{46CA24F3-8E56-4FA6-A43D-4F0E08266FA3}"
 	ProjectSection(SolutionItems) = preProject
 		LICENSE = LICENSE
-		README.md = README.md
 	EndProjectSection
 EndProject
 Global
@@ -38,5 +39,8 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {08517C40-DE6F-4C80-B4D2-75236497C4C3}
 	EndGlobalSection
 EndGlobal

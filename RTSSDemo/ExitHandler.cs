@@ -46,6 +46,7 @@ namespace RTSSDemo
         private static void DisableConsoleClose()
         {
             var hMenu = GetSystemMenu(GetConsoleWindow(), false);
+
             EnableMenuItem(hMenu, SC_CLOSE, MF_GRAYED); //disables the upper-right Close (X) button in the titlebar
             RemoveMenu(hMenu, SC_CLOSE, MF_BYCOMMAND); //removes the Close option in the Alt-Space menu
         }

@@ -6,6 +6,8 @@
 #ifndef _RTSS_SHARED_MEMORY_INCLUDED_
 #define _RTSS_SHARED_MEMORY_INCLUDED_
 /////////////////////////////////////////////////////////////////////////////
+#include "RTSSHooksTypes.h"
+/////////////////////////////////////////////////////////////////////////////
 // v1.0 memory structure
 typedef struct RTSS_SHARED_MEMORY_V_1_0
 {
@@ -253,15 +255,38 @@ typedef struct RTSS_SHARED_MEMORY_V_1_3
 		//maximum instantaneous framerate measured during statistics record period 
 } RTSS_SHARED_MEMORY_V_1_3, *LPRTSS_SHARED_MEMORY_V_1_3;
 /////////////////////////////////////////////////////////////////////////////
-#define APPFLAG_DD												0x00000010
-#define APPFLAG_D3D8											0x00000100
-#define APPFLAG_D3D9											0x00001000
-#define APPFLAG_D3D9EX											0x00002000
-#define APPFLAG_OGL												0x00010000
-#define APPFLAG_D3D10											0x00100000
-#define APPFLAG_D3D11											0x01000000
 
-#define APPFLAG_API_USAGE_MASK									(APPFLAG_DD | APPFLAG_D3D8 | APPFLAG_D3D9 | APPFLAG_D3D9EX | APPFLAG_OGL | APPFLAG_D3D10  | APPFLAG_D3D11)
+// WARNING! The following API usage flags are deprecated and valid in 2.9 
+// and older shared memory layout only
+
+#define APPFLAG_DEPRECATED_DD									0x00000010
+#define APPFLAG_DEPRECATED_D3D8									0x00000100
+#define APPFLAG_DEPRECATED_D3D9									0x00001000
+#define APPFLAG_DEPRECATED_D3D9EX								0x00002000
+#define APPFLAG_DEPRECATED_OGL									0x00010000
+#define APPFLAG_DEPRECATED_D3D10								0x00100000
+#define APPFLAG_DEPRECATED_D3D11								0x01000000
+
+#define APPFLAG_DEPRECATED_API_USAGE_MASK						(APPFLAG_DD | APPFLAG_D3D8 | APPFLAG_D3D9 | APPFLAG_D3D9EX | APPFLAG_OGL | APPFLAG_D3D10  | APPFLAG_D3D11)
+
+// The following API usage flags are valid in 2.10 and newer shared memory 
+// layout only
+
+#define APPFLAG_OGL												0x00000001 
+#define APPFLAG_DD												0x00000002
+#define APPFLAG_D3D8											0x00000003
+#define APPFLAG_D3D9											0x00000004
+#define APPFLAG_D3D9EX											0x00000005
+#define APPFLAG_D3D10											0x00000006
+#define APPFLAG_D3D11											0x00000007
+#define APPFLAG_D3D12											0x00000008
+#define APPFLAG_D3D12AFR										0x00000009
+#define APPFLAG_VULKAN											0x0000000A
+
+#define APPFLAG_API_USAGE_MASK									0x0000FFFF
+
+#define APPFLAG_ARCHITECTURE_X64								0x00010000
+#define APPFLAG_ARCHITECTURE_UWP								0x00020000
 
 #define APPFLAG_PROFILE_UPDATE_REQUESTED						0x10000000
 /////////////////////////////////////////////////////////////////////////////
@@ -311,6 +336,20 @@ typedef struct RTSS_SHARED_MEMORY
 		//Global OSD frame ID. Increment it to force the server to update OSD for all currently active 3D
 		//applications.
 
+	//next fields are valid for v2.14 and newer shared memory format only
+
+	LONG dwBusy;
+		//set bit 0 when you're writing to shared memory and reset it when done
+
+		//WARNING: do not forget to reset it, otherwise you'll completely lock OSD updates for all clients
+
+
+	//next fields are valid for v2.15 and newer shared memory format only
+
+	DWORD dwDesktopVideoCaptureFlags;
+	DWORD dwDesktopVideoCaptureStat[5];
+		//shared copy of desktop video capture flags and performance stats for 64-bit applications
+
 	//OSD slot descriptor structure
 
 	typedef struct RTSS_SHARED_MEMORY_OSD_ENTRY
@@ -324,6 +363,11 @@ typedef struct RTSS_SHARED_MEMORY
 
 		char	szOSDEx[4096];
 			//extended OSD slot text
+
+		//next fields are valid for v2.12 and newer shared memory format only
+
+		BYTE	buffer[262144];
+			//OSD slot data buffer
 
 	} RTSS_SHARED_MEMORY_OSD_ENTRY, *LPRTSS_SHARED_MEMORY_OSD_ENTRY;
 
@@ -445,13 +489,79 @@ typedef struct RTSS_SHARED_MEMORY
 		LARGE_INTEGER qwAudioCapturePTTEventPush2;
 		LARGE_INTEGER qwAudioCapturePTTEventRelease2;
 
+		//next fields are valid for v2.8 and newer shared memory format only
+
+		DWORD	dwPrerecordSizeLimit;
+		DWORD	dwPrerecordTimeLimit;
+
+		//next fields are valid for v2.13 and newer shared memory format only
+
+		LARGE_INTEGER qwStatTotalTime;
+		DWORD	dwStatFrameTimeLowBuf[1024];
+		DWORD	dwStatFramerate1Dot0PercentLow;
+		DWORD	dwStatFramerate0Dot1PercentLow;
+
 	} RTSS_SHARED_MEMORY_APP_ENTRY, *LPRTSS_SHARED_MEMORY_APP_ENTRY;
+
+	//WARNING: next fields should never (!!!) be accessed directly, use the offsets to access them in order to provide 
+	//compatibility with future versions
 
 	RTSS_SHARED_MEMORY_OSD_ENTRY arrOSD[8];
 		//array of OSD slots
 	RTSS_SHARED_MEMORY_APP_ENTRY arrApp[256];
 		//array of application descriptors
 
+	//next fields are valid for v2.9 and newer shared memory format only
+
+	//WARNING: due to design flaw there is no offset available for this field, so it must be calculated manually as
+	//dwAppArrOffset + dwAppArrSize * dwAppEntrySize
+
+	VIDEO_CAPTURE_PARAM autoVideoCaptureParam;		
+
 } RTSS_SHARED_MEMORY, *LPRTSS_SHARED_MEMORY;
+/////////////////////////////////////////////////////////////////////////////
+typedef struct RTSS_EMBEDDED_OBJECT
+{
+	DWORD dwSignature;
+		//embedded object signature
+	DWORD dwSize;
+		//embedded object size in bytes
+	LONG dwWidth;
+		//embedded object width in pixels (if positive) or in chars (if negative)
+	LONG dwHeight;
+		//embedded object height in pixels (if positive) or in chars (if negative)
+	LONG dwMargin;
+		//embedded object margin in pixels
+} RTSS_EMBEDDED_OBJECT, *LPRTSS_EMBEDDED_OBJECT;
+/////////////////////////////////////////////////////////////////////////////
+#define RTSS_EMBEDDED_OBJECT_GRAPH_SIGNATURE						'GR00'
+/////////////////////////////////////////////////////////////////////////////
+#define RTSS_EMBEDDED_OBJECT_GRAPH_FLAG_FILLED						1
+#define RTSS_EMBEDDED_OBJECT_GRAPH_FLAG_FRAMERATE					2
+#define RTSS_EMBEDDED_OBJECT_GRAPH_FLAG_FRAMETIME					4
+#define RTSS_EMBEDDED_OBJECT_GRAPH_FLAG_BAR							8
+#define RTSS_EMBEDDED_OBJECT_GRAPH_FLAG_BGND						16
+/////////////////////////////////////////////////////////////////////////////
+#pragma warning (disable : 4200)
+
+typedef struct RTSS_EMBEDDED_OBJECT_GRAPH
+{
+	RTSS_EMBEDDED_OBJECT header;
+		//embedded object header
+
+	DWORD dwFlags;
+		//bitmask containing RTSS_EMBEDDED_OBJECT_GRAPH_FLAG_XXX flags
+	FLOAT fltMin;
+		//graph mininum value
+	FLOAT fltMax;	
+		//graph maximum value
+	DWORD dwDataCount;
+		//count of data samples in fltData array
+	FLOAT fltData[0];
+		//graph data samples array
+
+} RTSS_EMBEDDED_OBJECT_GRAPH, *LPRTSS_EMBEDDED_OBJECT_GRAPH;
+
+#pragma warning (default : 4200)
 /////////////////////////////////////////////////////////////////////////////
 #endif //_RTSS_SHARED_MEMORY_INCLUDED_

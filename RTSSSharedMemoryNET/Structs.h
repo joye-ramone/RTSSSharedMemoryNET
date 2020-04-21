@@ -18,6 +18,7 @@ namespace RTSSSharedMemoryNET {
         Direct3D11  = APPFLAG_D3D11,
 
         ProfileUpdateRequested = APPFLAG_PROFILE_UPDATE_REQUESTED,
+
         MASK = (APPFLAG_DD | APPFLAG_D3D8 | APPFLAG_D3D9 | APPFLAG_D3D9EX | APPFLAG_OGL | APPFLAG_D3D10  | APPFLAG_D3D11),
     };
 
@@ -46,6 +47,7 @@ namespace RTSSSharedMemoryNET {
         RequestCaptureOSD      = VIDEOCAPTUREFLAG_REQUEST_CAPTURE_OSD,
 
         INTERNAL_RESIZE = VIDEOCAPTUREFLAG_INTERNAL_RESIZE,
+
         MASK = (VIDEOCAPTUREFLAG_REQUEST_CAPTURE_START | VIDEOCAPTUREFLAG_REQUEST_CAPTURE_PROGRESS | VIDEOCAPTUREFLAG_REQUEST_CAPTURE_STOP),
     };
 
@@ -88,6 +90,7 @@ namespace RTSSSharedMemoryNET {
         DWORD StatFrameTimeAvg;
         DWORD StatFrameTimeMax;
         DWORD StatFrameTimeCount;
+
         /* TODO
         DWORD StatFrameTimeBuf[1024];
         DWORD StatFrameTimeBufPos;

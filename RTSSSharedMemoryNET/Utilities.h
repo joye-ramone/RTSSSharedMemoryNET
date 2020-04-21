@@ -1,6 +1,7 @@
 #pragma once
 
-//http://stackoverflow.com/a/673336/489071
+// http://stackoverflow.com/a/673336/489071
+
 template <typename T>
 public ref class using_auto_ptr
 {
@@ -14,6 +15,7 @@ public:
     ~using_auto_ptr() { delete m_p; }
 
     T^ operator->() { return m_p; }
+
     static T^ operator*(using_auto_ptr<T>% p) { return p->m_p; } //C4383 says I should do it this way
 
     bool m_used;
@@ -37,6 +39,5 @@ private:
 #define THROW_LAST_ERROR() THROW_HR(System::Runtime::InteropServices::Marshal::GetHRForLastWin32Error())
 
 //for strcmp and co
-#define STRMATCHES(x) (x) == 0
 #define STRLESSTHAN(x) (x) < 0
 #define STRMORETHAN(x) (x) > 0

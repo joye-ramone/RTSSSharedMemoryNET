@@ -18,3 +18,4 @@ Thumbs.db
 
 packages/*
 !packages/repositories.config
+/.vs/

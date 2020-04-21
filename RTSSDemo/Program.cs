@@ -10,7 +10,8 @@ namespace RTSSDemo
         {
             //enforces a nice cleanup
             //just hitting X or Ctrl+C normally won't actually dispose the using() below
-            ExitHandler.Init(ctrlType => {
+            ExitHandler.Init(ctrlType =>
+            {
                 Console.WriteLine("\nCleaning up and exiting...");
                 return true; //cancel event
             });
@@ -19,7 +20,8 @@ namespace RTSSDemo
 
             Console.WriteLine("Current OSD entries:");
             var osdEntries = OSD.GetOSDEntries();
-            foreach( var osd in osdEntries )
+
+            foreach (var osd in osdEntries)
             {
                 Console.ForegroundColor = ConsoleColor.Cyan;
                 Console.WriteLine(osd.Owner);
@@ -30,30 +32,32 @@ namespace RTSSDemo
             ///////////////////////////////////////////////////////////////////
 
             Console.WriteLine("Current app entries with GPU contexts:");
-            var appEntries = OSD.GetAppEntries().Where( x => (x.Flags & AppFlags.MASK) != AppFlags.None ).ToArray();
-            foreach( var app in appEntries )
+            var appEntries = OSD.GetAppEntries().Where(x => (x.Flags & AppFlags.MASK) != AppFlags.None).ToArray();
+
+            foreach (var app in appEntries)
             {
                 Console.ForegroundColor = ConsoleColor.Magenta;
                 Console.WriteLine("{0}:{1}", app.ProcessId, app.Name);
                 Console.ResetColor();
                 Console.WriteLine("{0}, {1}FPS", app.Flags, app.InstantaneousFrames);
             }
-            Console.WriteLine();
+
+            Console.WriteLine("Press any key...");
 
             ///////////////////////////////////////////////////////////////////
 
-            using( var osd = new OSD("RTSSDemo") )
-            while( true )
-            {
-                Console.WriteLine("Enter some text:");
-                var text = Console.ReadLine();
+            using (var osd = new OSD("RTSSDemo"))
+                while (true)
+                {
+                    Console.WriteLine("Enter some text:");
+                    var text = Console.ReadLine();
 
-                //if we hit Ctrl+C while waiting for ReadLine, it returns null
-                if( text == null )
-                    break;
+                    //if we hit Ctrl+C while waiting for ReadLine, it returns null
+                    if (text == null)
+                        break;
 
-                osd.Update(text);
-            }
+                    osd.Update(text);
+                }
         }
     }
 }

@@ -1,4 +1,4 @@
-// OSD.h
+// Osd.h
 
 #pragma once
 
@@ -28,12 +28,14 @@ namespace RTSSSharedMemoryNET {
         }
 
         void Update(String^ text);
+
         static array<OSDEntry^>^ GetOSDEntries();
         static array<AppEntry^>^ GetAppEntries();
 
     private:
         static void openSharedMemory(HANDLE* phMapFile, LPRTSS_SHARED_MEMORY* ppMem);
         static void closeSharedMemory(HANDLE hMapFile, LPRTSS_SHARED_MEMORY pMem);
+
         static DateTime timeFromTickcount(DWORD ticks);
     };
 
