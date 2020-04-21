@@ -22,21 +22,23 @@ namespace RTSSSharedMemoryNET {
         ~OSD();
         !OSD();
 
+        void Update(String^ text);
+
         static property System::Version^ Version
         {
             System::Version^ get();
         }
 
-        void Update(String^ text);
-
         static array<OSDEntry^>^ GetOSDEntries();
         static array<AppEntry^>^ GetAppEntries();
 
     private:
+        static DWORD getVersionInternal();
+
         static void openSharedMemory(HANDLE* phMapFile, LPRTSS_SHARED_MEMORY* ppMem);
         static void closeSharedMemory(HANDLE hMapFile, LPRTSS_SHARED_MEMORY pMem);
 
-        static DateTime timeFromTickcount(DWORD ticks);
+        static DateTime timeFromTickCount(DWORD ticks);
     };
 
     LPCWSTR MBtoWC(const char* str);

@@ -65,18 +65,6 @@ namespace RTSSSharedMemoryNET {
         Marshal::FreeHGlobal(IntPtr((LPVOID)m_entryName));
     }
 
-    System::Version^ OSD::Version::get()
-    {
-        HANDLE hMapFile = NULL;
-        LPRTSS_SHARED_MEMORY pMem = NULL;
-        openSharedMemory(&hMapFile, &pMem);
-
-        auto ver = gcnew System::Version(pMem->dwVersion >> 16, pMem->dwVersion & 0xFFFF);
-
-        closeSharedMemory(hMapFile, pMem);
-        return ver;
-    }
-
     ///<summary>
     ///Text should be no longer than 4095 chars once converted to ANSI. Lower case looks awful.
     ///</summary>
@@ -128,6 +116,30 @@ namespace RTSSSharedMemoryNET {
 
         closeSharedMemory(hMapFile, pMem);
         Marshal::FreeHGlobal(IntPtr((LPVOID)lpText));
+    }
+
+    System::Version^ OSD::Version::get()
+    {
+        DWORD dwResult = getVersionInternal();
+        auto ver = gcnew System::Version(dwResult >> 16, dwResult & 0xFFFF);
+        return ver;
+    }
+
+    //BOOL bFormatTagsSupported = (dwSharedMemoryVersion >= 0x0002000b);
+    ////text format tags are supported for shared memory v2.11 and higher
+    //BOOL bObjTagsSupported = (dwSharedMemoryVersion >= 0x0002000c);
+    ////embedded object tags are supported for shared memory v2.12 and higher
+
+    DWORD OSD::getVersionInternal()
+    {
+        HANDLE hMapFile = NULL;
+        LPRTSS_SHARED_MEMORY pMem = NULL;
+        openSharedMemory(&hMapFile, &pMem);
+
+        DWORD dwResult = pMem->dwVersion;
+
+        closeSharedMemory(hMapFile, pMem);
+        return dwResult;
     }
 
     array<OSDEntry^>^ OSD::GetOSDEntries()
@@ -182,15 +194,15 @@ namespace RTSSSharedMemoryNET {
                 entry->Flags = (AppFlags)pEntry->dwFlags;
 
                 //instantaneous framerate fields
-                entry->InstantaneousTimeStart = timeFromTickcount(pEntry->dwTime0);
-                entry->InstantaneousTimeEnd = timeFromTickcount(pEntry->dwTime1);
+                entry->InstantaneousTimeStart = timeFromTickCount(pEntry->dwTime0);
+                entry->InstantaneousTimeEnd = timeFromTickCount(pEntry->dwTime1);
                 entry->InstantaneousFrames = pEntry->dwFrames;
                 entry->InstantaneousFrameTime = TimeSpan::FromTicks(pEntry->dwFrameTime * TICKS_PER_MICROSECOND);
 
                 //framerate stats fields
                 entry->StatFlags = (StatFlags)pEntry->dwStatFlags;
-                entry->StatTimeStart = timeFromTickcount(pEntry->dwStatTime0);
-                entry->StatTimeEnd = timeFromTickcount(pEntry->dwStatTime1);
+                entry->StatTimeStart = timeFromTickCount(pEntry->dwStatTime0);
+                entry->StatTimeEnd = timeFromTickCount(pEntry->dwStatTime1);
                 entry->StatFrames = pEntry->dwStatFrames;
                 entry->StatCount = pEntry->dwStatCount;
                 entry->StatFramerateMin = pEntry->dwStatFramerateMin;
@@ -298,7 +310,7 @@ namespace RTSSSharedMemoryNET {
             CloseHandle(hMapFile);
     }
 
-    DateTime OSD::timeFromTickcount(DWORD ticks)
+    DateTime OSD::timeFromTickCount(DWORD ticks)
     {
         return DateTime::Now - TimeSpan::FromMilliseconds(ticks);
     }
