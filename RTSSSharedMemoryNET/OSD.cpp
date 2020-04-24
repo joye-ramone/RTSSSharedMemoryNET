@@ -9,9 +9,6 @@
 
 namespace RTSSSharedMemoryNET {
 
-    ///<param name="entryName">
-    ///The name of the OSD entry. Should be unique and not more than 255 chars once converted to ANSI.
-    ///</param>
     OSD::OSD(String^ entryName)
     {
         if( String::IsNullOrWhiteSpace(entryName) )
@@ -65,9 +62,6 @@ namespace RTSSSharedMemoryNET {
         Marshal::FreeHGlobal(IntPtr((LPVOID)m_entryName));
     }
 
-    ///<summary>
-    ///Text should be no longer than 4095 chars once converted to ANSI. Lower case looks awful.
-    ///</summary>
     void OSD::Update(String^ text)
     {
         if( text == nullptr )
