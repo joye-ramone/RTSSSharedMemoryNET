@@ -103,6 +103,7 @@ namespace RTSSSharedMemoryNET {
                     strncpy_s(pEntry->szOSD, lpText, sizeof(pEntry->szOSD)-1);
 
                 pMem->dwOSDFrame++; //forces OSD update
+
                 break;
             }
 
@@ -117,6 +118,85 @@ namespace RTSSSharedMemoryNET {
         closeSharedMemory(hMapFile, pMem);
         Marshal::FreeHGlobal(IntPtr((LPVOID)lpText));
     }
+
+    DWORD OSD::EmbedGraph(DWORD dwOffset, array<FLOAT>^ lpBuffer, DWORD dwBufferPos, LONG dwWidth, LONG dwHeight, LONG dwMargin, FLOAT fltMin, FLOAT fltMax, EMBEDDED_OBJECT_GRAPH dwFlags)
+    {
+        DWORD dwResult = 0;
+
+        HANDLE hMapFile = NULL;
+        LPRTSS_SHARED_MEMORY pMem = NULL;
+        openSharedMemory(&hMapFile, &pMem);
+
+        //start at either our previously used slot, or the top
+        for (DWORD i = (m_osdSlot == 0 ? 1 : m_osdSlot); i < pMem->dwOSDArrSize; i++)
+        {
+            auto pEntry = (RTSS_SHARED_MEMORY::LPRTSS_SHARED_MEMORY_OSD_ENTRY)((LPBYTE)pMem + pMem->dwOSDArrOffset + (i * pMem->dwOSDEntrySize));
+
+            //if we need a new slot and this one is unused, claim it
+            if (m_osdSlot == 0 && !strlen(pEntry->szOSDOwner))
+            {
+                m_osdSlot = i;
+                strcpy_s(pEntry->szOSDOwner, m_entryName);
+            }
+
+            //if this is our slot
+            if (strcmp(pEntry->szOSDOwner, m_entryName) == 0)
+            {
+                //embedded graphs are supported for v2.12 and higher shared memory
+                if (pMem->dwVersion >= RTSS_VERSION(2, 12))
+                {
+                    //validate embedded object offset and size and ensure that we don't overrun the buffer
+                    if (dwOffset + sizeof(RTSS_EMBEDDED_OBJECT_GRAPH) + lpBuffer->Length * sizeof(FLOAT) > sizeof(pEntry->buffer))
+                    {
+                        closeSharedMemory(hMapFile, pMem);
+
+                        return 0;
+                    }
+
+                    //get pointer to object in buffer
+                    LPRTSS_EMBEDDED_OBJECT_GRAPH lpGraph = (LPRTSS_EMBEDDED_OBJECT_GRAPH)(pEntry->buffer + dwOffset);
+
+                    lpGraph->header.dwSignature = RTSS_EMBEDDED_OBJECT_GRAPH_SIGNATURE;
+                    lpGraph->header.dwSize = sizeof(RTSS_EMBEDDED_OBJECT_GRAPH) + lpBuffer->Length * sizeof(FLOAT);
+                    lpGraph->header.dwWidth = dwWidth;
+                    lpGraph->header.dwHeight = dwHeight;
+                    lpGraph->header.dwMargin = dwMargin;
+                    lpGraph->dwFlags = (DWORD)dwFlags;
+                    lpGraph->fltMin = fltMin;
+                    lpGraph->fltMax = fltMax;
+                    lpGraph->dwDataCount = lpBuffer->Length;
+
+                    if (lpBuffer->Length > 0)
+                    {
+                        for (DWORD dwPos = 0; dwPos < lpBuffer->Length; dwPos++)
+                        {
+                            FLOAT fltData = lpBuffer[dwBufferPos];
+
+                            lpGraph->fltData[dwPos] = fltData;
+
+                            dwBufferPos = (dwBufferPos + 1) & (lpBuffer->Length - 1);
+                        }
+                    }
+
+                    dwResult = lpGraph->header.dwSize;
+                }
+
+                break;
+            }
+
+            //in case we lost our previously used slot or something, let's start over
+            if (m_osdSlot != 0)
+            {
+                m_osdSlot = 0;
+                i = 1;
+            }
+        }
+
+        closeSharedMemory(hMapFile, pMem);
+
+        return dwResult;
+    }
+
 
     System::Version^ OSD::Version::get()
     {
