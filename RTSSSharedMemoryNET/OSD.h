@@ -19,15 +19,6 @@ namespace RTSSSharedMemoryNET {
 
     public:
 
-        enum class EMBEDDED_OBJECT_GRAPH : DWORD
-        {
-            FLAG_FILLED     = RTSS_EMBEDDED_OBJECT_GRAPH_FLAG_FILLED,
-            FLAG_FRAMERATE  = RTSS_EMBEDDED_OBJECT_GRAPH_FLAG_FRAMERATE,
-            FLAG_FRAMETIME  = RTSS_EMBEDDED_OBJECT_GRAPH_FLAG_FRAMETIME,
-            FLAG_BAR        = RTSS_EMBEDDED_OBJECT_GRAPH_FLAG_BAR,
-            FLAG_BGND       = RTSS_EMBEDDED_OBJECT_GRAPH_FLAG_BGND
-        };
-
         OSD(String^ entryName);
         ~OSD();
         !OSD();
@@ -42,7 +33,10 @@ namespace RTSSSharedMemoryNET {
         }
 
         static array<OSDEntry^>^ GetOSDEntries();
-        static array<AppEntry^>^ GetAppEntries();
+        static array<AppEntry^>^ GetAppEntries(AppFlags flags);
+
+        static DWORD GetOSDCount();
+        static DWORD GetAppCount(AppFlags flags);
 
     private:
 

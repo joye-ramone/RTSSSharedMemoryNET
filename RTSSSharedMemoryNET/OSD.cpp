@@ -22,6 +22,33 @@ namespace RTSSSharedMemoryNET {
         HANDLE hMapFile = NULL;
         LPRTSS_SHARED_MEMORY pMem = NULL;
         openSharedMemory(&hMapFile, &pMem);
+
+        //start at either our previously used slot, or the top
+        for (DWORD i = (m_osdSlot == 0 ? 1 : m_osdSlot); i < pMem->dwOSDArrSize; i++)
+        {
+            auto pEntry = (RTSS_SHARED_MEMORY::LPRTSS_SHARED_MEMORY_OSD_ENTRY)((LPBYTE)pMem + pMem->dwOSDArrOffset + (i * pMem->dwOSDEntrySize));
+
+            //if we need a new slot and this one is unused, claim it
+            if (m_osdSlot == 0 && !strlen(pEntry->szOSDOwner))
+            {
+                m_osdSlot = i;
+                strcpy_s(pEntry->szOSDOwner, m_entryName);
+            }
+
+            //if this is our slot
+            if (strcmp(pEntry->szOSDOwner, m_entryName) == 0)
+            {
+                break;
+            }
+
+            //in case we lost our previously used slot or something, let's start over
+            if (m_osdSlot != 0)
+            {
+                m_osdSlot = 0;
+                i = 1;
+            }
+        }
+
         closeSharedMemory(hMapFile, pMem);
 
         m_osdSlot = 0;
@@ -62,6 +89,16 @@ namespace RTSSSharedMemoryNET {
         Marshal::FreeHGlobal(IntPtr((LPVOID)m_entryName));
     }
 
+// push managed state on to stack and set unmanaged state
+#pragma managed(push, off)
+
+    DWORD InterlockedBitTestAndSetLocal(LPRTSS_SHARED_MEMORY pMem) {
+        DWORD dwBusy = InterlockedBitTestAndSet(&pMem->dwBusy, 0);
+        return dwBusy;
+    }
+
+#pragma managed(pop)
+
     void OSD::Update(String^ text)
     {
         if( text == nullptr )
@@ -91,10 +128,33 @@ namespace RTSSSharedMemoryNET {
             if( strcmp(pEntry->szOSDOwner, m_entryName) == 0 )
             {
                 //use extended text slot for v2.7 and higher shared memory, it allows displaying 4096 symbols instead of 256 for regular text slot
-                if( pMem->dwVersion >= RTSS_VERSION(2,7) )
-                    strncpy_s(pEntry->szOSDEx, lpText, sizeof(pEntry->szOSDEx)-1);
+                if (pMem->dwVersion >= RTSS_VERSION(2, 7))
+                {
+                    //OSD locking is supported on v2.14 and higher shared memory
+                    if (pMem->dwVersion >= RTSS_VERSION(2, 14))
+                    {
+                        //bit 0 of this variable will be set if OSD is locked by renderer and cannot be refreshed
+                        //at the moment
+
+                        //DWORD dwBusy = InterlockedBitTestAndSet(&pMem->dwBusy, 0);
+                        DWORD dwBusy = InterlockedBitTestAndSetLocal(pMem);
+
+                        if (!dwBusy)
+                        {
+                            strncpy_s(pEntry->szOSDEx, sizeof(pEntry->szOSDEx), lpText, sizeof(pEntry->szOSDEx) - 1);
+
+                            pMem->dwBusy = 0;
+                        }
+                    }
+                    else
+                    {
+                        strncpy_s(pEntry->szOSDEx, lpText, sizeof(pEntry->szOSDEx) - 1);
+                    }
+                }
                 else
-                    strncpy_s(pEntry->szOSD, lpText, sizeof(pEntry->szOSD)-1);
+                {
+                    strncpy_s(pEntry->szOSD, lpText, sizeof(pEntry->szOSD) - 1);
+                }
 
                 pMem->dwOSDFrame++; //forces OSD update
 
@@ -246,7 +306,7 @@ namespace RTSSSharedMemoryNET {
         return list->ToArray();
     }
 
-    array<AppEntry^>^ OSD::GetAppEntries()
+    array<AppEntry^>^ OSD::GetAppEntries(AppFlags flags)
     {
         HANDLE hMapFile = NULL;
         LPRTSS_SHARED_MEMORY pMem = NULL;
@@ -260,90 +320,143 @@ namespace RTSSSharedMemoryNET {
             auto pEntry = (RTSS_SHARED_MEMORY::LPRTSS_SHARED_MEMORY_APP_ENTRY)( (LPBYTE)pMem + pMem->dwAppArrOffset + (i * pMem->dwAppEntrySize) );
             if( pEntry->dwProcessID )
             {
-                auto entry = gcnew AppEntry;
-                
-                //basic fields
-                entry->ProcessId = pEntry->dwProcessID;
-                entry->Name = Marshal::PtrToStringAnsi(IntPtr(pEntry->szName));
-                entry->Flags = (AppFlags)pEntry->dwFlags;
-
-                //instantaneous framerate fields
-                entry->InstantaneousTimeStart = timeFromTickCount(pEntry->dwTime0);
-                entry->InstantaneousTimeEnd = timeFromTickCount(pEntry->dwTime1);
-                entry->InstantaneousFrames = pEntry->dwFrames;
-                entry->InstantaneousFrameTime = TimeSpan::FromTicks(pEntry->dwFrameTime * TICKS_PER_MICROSECOND);
-
-                //framerate stats fields
-                entry->StatFlags = (StatFlags)pEntry->dwStatFlags;
-                entry->StatTimeStart = timeFromTickCount(pEntry->dwStatTime0);
-                entry->StatTimeEnd = timeFromTickCount(pEntry->dwStatTime1);
-                entry->StatFrames = pEntry->dwStatFrames;
-                entry->StatCount = pEntry->dwStatCount;
-                entry->StatFramerateMin = pEntry->dwStatFramerateMin;
-                entry->StatFramerateAvg = pEntry->dwStatFramerateAvg;
-                entry->StatFramerateMax = pEntry->dwStatFramerateMax;
-
-                if( pMem->dwVersion >= RTSS_VERSION(2,5) )
+                if ((pEntry->dwFlags & (DWORD)flags) != 0)
                 {
-                    entry->StatFrameTimeMin = pEntry->dwStatFrameTimeMin;
-                    entry->StatFrameTimeAvg = pEntry->dwStatFrameTimeAvg;
-                    entry->StatFrameTimeMax = pEntry->dwStatFrameTimeMax;
-                    entry->StatFrameTimeCount = pEntry->dwStatFrameTimeCount;
 
-                    //TODO - frametime buffer?
+                    auto entry = gcnew AppEntry;
+
+                    //basic fields
+                    entry->ProcessId = pEntry->dwProcessID;
+                    entry->Name = Marshal::PtrToStringAnsi(IntPtr(pEntry->szName));
+                    entry->Flags = (AppFlags)pEntry->dwFlags;
+
+                    //instantaneous framerate fields
+                    entry->InstantaneousTimeStart = timeFromTickCount(pEntry->dwTime0);
+                    entry->InstantaneousTimeEnd = timeFromTickCount(pEntry->dwTime1);
+                    entry->InstantaneousFrames = pEntry->dwFrames;
+                    entry->InstantaneousFrameTime = TimeSpan::FromTicks(pEntry->dwFrameTime * TICKS_PER_MICROSECOND);
+
+                    //framerate stats fields
+                    entry->StatFlags = (StatFlags)pEntry->dwStatFlags;
+                    entry->StatTimeStart = timeFromTickCount(pEntry->dwStatTime0);
+                    entry->StatTimeEnd = timeFromTickCount(pEntry->dwStatTime1);
+                    entry->StatFrames = pEntry->dwStatFrames;
+                    entry->StatCount = pEntry->dwStatCount;
+                    entry->StatFramerateMin = pEntry->dwStatFramerateMin;
+                    entry->StatFramerateAvg = pEntry->dwStatFramerateAvg;
+                    entry->StatFramerateMax = pEntry->dwStatFramerateMax;
+
+                    if (pMem->dwVersion >= RTSS_VERSION(2, 5))
+                    {
+                        entry->StatFrameTimeMin = pEntry->dwStatFrameTimeMin;
+                        entry->StatFrameTimeAvg = pEntry->dwStatFrameTimeAvg;
+                        entry->StatFrameTimeMax = pEntry->dwStatFrameTimeMax;
+                        entry->StatFrameTimeCount = pEntry->dwStatFrameTimeCount;
+
+                        //TODO - frametime buffer?
+                    }
+
+                    //OSD fields
+                    entry->OSDCoordinateX = pEntry->dwOSDX;
+                    entry->OSDCoordinateY = pEntry->dwOSDY;
+                    entry->OSDZoom = pEntry->dwOSDPixel;
+                    entry->OSDFrameId = pEntry->dwOSDFrame;
+                    entry->OSDColor = Color::FromArgb(pEntry->dwOSDColor);
+                    if (pMem->dwVersion >= RTSS_VERSION(2, 1))
+                        entry->OSDBackgroundColor = Color::FromArgb(pEntry->dwOSDBgndColor);
+
+                    //screenshot fields
+                    entry->ScreenshotFlags = (ScreenshotFlags)pEntry->dwScreenCaptureFlags;
+                    entry->ScreenshotPath = Marshal::PtrToStringAnsi(IntPtr(pEntry->szScreenCapturePath));
+                    if (pMem->dwVersion >= RTSS_VERSION(2, 2))
+                    {
+                        entry->ScreenshotQuality = pEntry->dwScreenCaptureQuality;
+                        entry->ScreenshotThreads = pEntry->dwScreenCaptureThreads;
+                    }
+
+                    //video capture fields
+                    if (pMem->dwVersion >= RTSS_VERSION(2, 2))
+                    {
+                        entry->VideoCaptureFlags = (VideoCaptureFlags)pEntry->dwVideoCaptureFlags;
+                        entry->VideoCapturePath = Marshal::PtrToStringAnsi(IntPtr(pEntry->szVideoCapturePath));
+                        entry->VideoFramerate = pEntry->dwVideoFramerate;
+                        entry->VideoFramesize = pEntry->dwVideoFramesize;
+                        entry->VideoFormat = pEntry->dwVideoFormat;
+                        entry->VideoQuality = pEntry->dwVideoQuality;
+                        entry->VideoCaptureThreads = pEntry->dwVideoCaptureThreads;
+                    }
+                    if (pMem->dwVersion >= RTSS_VERSION(2, 4))
+                        entry->VideoCaptureFlagsEx = pEntry->dwVideoCaptureFlagsEx;
+
+                    //audio capture fields
+                    if (pMem->dwVersion >= RTSS_VERSION(2, 3))
+                        entry->AudioCaptureFlags = pEntry->dwAudioCaptureFlags;
+                    if (pMem->dwVersion >= RTSS_VERSION(2, 5))
+                        entry->AudioCaptureFlags2 = pEntry->dwAudioCaptureFlags2;
+                    if (pMem->dwVersion >= RTSS_VERSION(2, 6))
+                    {
+                        entry->AudioCapturePTTEventPush = pEntry->qwAudioCapturePTTEventPush.QuadPart;
+                        entry->AudioCapturePTTEventRelease = pEntry->qwAudioCapturePTTEventRelease.QuadPart;
+                        entry->AudioCapturePTTEventPush2 = pEntry->qwAudioCapturePTTEventPush2.QuadPart;
+                        entry->AudioCapturePTTEventRelease2 = pEntry->qwAudioCapturePTTEventRelease2.QuadPart;
+                    }
+
+                    list->Add(entry);
                 }
-
-                //OSD fields
-                entry->OSDCoordinateX = pEntry->dwOSDX;
-                entry->OSDCoordinateY = pEntry->dwOSDY;
-                entry->OSDZoom = pEntry->dwOSDPixel;
-                entry->OSDFrameId = pEntry->dwOSDFrame;
-                entry->OSDColor = Color::FromArgb(pEntry->dwOSDColor);
-                if( pMem->dwVersion >= RTSS_VERSION(2,1) )
-                    entry->OSDBackgroundColor = Color::FromArgb(pEntry->dwOSDBgndColor);
-
-                //screenshot fields
-                entry->ScreenshotFlags = (ScreenshotFlags)pEntry->dwScreenCaptureFlags;
-                entry->ScreenshotPath = Marshal::PtrToStringAnsi(IntPtr(pEntry->szScreenCapturePath));
-                if( pMem->dwVersion >= RTSS_VERSION(2,2) )
-                {
-                    entry->ScreenshotQuality = pEntry->dwScreenCaptureQuality;
-                    entry->ScreenshotThreads = pEntry->dwScreenCaptureThreads;
-                }
-
-                //video capture fields
-                if( pMem->dwVersion >= RTSS_VERSION(2,2) )
-                {
-                    entry->VideoCaptureFlags = (VideoCaptureFlags)pEntry->dwVideoCaptureFlags;
-                    entry->VideoCapturePath = Marshal::PtrToStringAnsi(IntPtr(pEntry->szVideoCapturePath));
-                    entry->VideoFramerate = pEntry->dwVideoFramerate;
-                    entry->VideoFramesize = pEntry->dwVideoFramesize;
-                    entry->VideoFormat = pEntry->dwVideoFormat;
-                    entry->VideoQuality = pEntry->dwVideoQuality;
-                    entry->VideoCaptureThreads = pEntry->dwVideoCaptureThreads;
-                }
-                if( pMem->dwVersion >= RTSS_VERSION(2,4) )
-                    entry->VideoCaptureFlagsEx = pEntry->dwVideoCaptureFlagsEx;
-
-                //audio capture fields
-                if( pMem->dwVersion >= RTSS_VERSION(2,3) )
-                    entry->AudioCaptureFlags = pEntry->dwAudioCaptureFlags;
-                if( pMem->dwVersion >= RTSS_VERSION(2,5) )
-                    entry->AudioCaptureFlags2 = pEntry->dwAudioCaptureFlags2;
-                if( pMem->dwVersion >= RTSS_VERSION(2,6) )
-                {
-                    entry->AudioCapturePTTEventPush = pEntry->qwAudioCapturePTTEventPush.QuadPart;
-                    entry->AudioCapturePTTEventRelease = pEntry->qwAudioCapturePTTEventRelease.QuadPart;
-                    entry->AudioCapturePTTEventPush2 = pEntry->qwAudioCapturePTTEventPush2.QuadPart;
-                    entry->AudioCapturePTTEventRelease2 = pEntry->qwAudioCapturePTTEventRelease2.QuadPart;
-                }
-
-                list->Add(entry);
             }
         }
 
         closeSharedMemory(hMapFile, pMem);
         return list->ToArray();
+    }
+
+    DWORD OSD::GetOSDCount()
+    {
+        HANDLE hMapFile = NULL;
+        LPRTSS_SHARED_MEMORY pMem = NULL;
+        openSharedMemory(&hMapFile, &pMem);
+
+        DWORD dwClients = 0;
+
+        //include all slots
+        for (DWORD i = 0; i < pMem->dwOSDArrSize; i++)
+        {
+            auto pEntry = (RTSS_SHARED_MEMORY::LPRTSS_SHARED_MEMORY_OSD_ENTRY)((LPBYTE)pMem + pMem->dwOSDArrOffset + (i * pMem->dwOSDEntrySize));
+            if (strlen(pEntry->szOSDOwner))
+            {
+                dwClients++;
+            }
+        }
+
+        closeSharedMemory(hMapFile, pMem);
+
+        return dwClients;
+    }
+
+    DWORD OSD::GetAppCount(AppFlags flags)
+    {
+        HANDLE hMapFile = NULL;
+        LPRTSS_SHARED_MEMORY pMem = NULL;
+        openSharedMemory(&hMapFile, &pMem);
+
+        DWORD dwClients = 0;
+
+        //include all slots
+        for (DWORD i = 0; i < pMem->dwAppArrSize; i++)
+        {
+            auto pEntry = (RTSS_SHARED_MEMORY::LPRTSS_SHARED_MEMORY_APP_ENTRY)((LPBYTE)pMem + pMem->dwAppArrOffset + (i * pMem->dwAppEntrySize));
+            if (pEntry->dwProcessID)
+            {
+                if ((pEntry->dwFlags & (DWORD)flags) != 0)
+                {
+                    dwClients++;
+                }
+            }
+        }
+
+        closeSharedMemory(hMapFile, pMem);
+
+        return dwClients;
     }
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

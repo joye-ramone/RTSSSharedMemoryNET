@@ -54,7 +54,7 @@ namespace RTSSDemo
 
             string predefinedTags = "<P=0,0><A0=-5><A1=4><C0=FFA0A0><C1=FF00A0><C2=FFFFFF><S0=-50><S1=50>";
 
-            string osdText = @"<C0>CPU<S0>1<S><C>	<A0>6<A><A1><S1> %<S><A>";
+            string osdText = @""; // <C0>CPU<S0>1<S><C>	<A0>6<A><A1><S1> %<S><A>
 
             float[] history1 = new float[512];
             float[] history2 = new float[512];
@@ -67,21 +67,22 @@ namespace RTSSDemo
                 history3[i] = 0;
             }
 
-            uint pos = 0;
-
-            OSD.EMBEDDED_OBJECT_GRAPH dwFlags = OSD.EMBEDDED_OBJECT_GRAPH.FLAG_FILLED;
+            EMBEDDED_OBJECT_GRAPH dwFlags = EMBEDDED_OBJECT_GRAPH.FLAG_FILLED;
 
             var r = new Random();
 
-            //int iteration = 0;
-
             Console.WriteLine("Start ?");
             Console.ReadLine();
+
+            uint pos = 0;
 
             using (var osd = new OSD("RTSSDemo"))
             {
                 while (true)
                 {
+                    uint numberOfOsd = OSD.GetOSDCount();
+                    uint numberOfApp = OSD.GetAppCount(AppFlags.MASK);
+
                     uint dwObjectOffset = 0;
                     uint dwObjectSize = 0;
 
@@ -92,6 +93,10 @@ namespace RTSSDemo
                     float value1 = history1[pos] = (float)(r.Next(0, 150) + r.NextDouble());
                     float value2 = history2[pos] = (float)(r.Next(0, 150) + r.NextDouble());
                     float value3 = history3[pos] = (float)(r.Next(0, 150) + r.NextDouble());
+
+                    //float value1 = history1[pos] = 200;
+                    //float value2 = history2[pos] = 200;
+                    //float value3 = history3[pos] = 200;
 
                     pos = (pos + 1) & (512 - 1);
 
@@ -126,7 +131,7 @@ namespace RTSSDemo
                     if (dwObjectSize > 0)
                     {
                         //print embedded object
-                        string strObj = string.Format("<C0><OBJ={0:X8}><A0><S1>{1:.0}<A> %%<S><C>\n", dwObjectOffset, value3);
+                        string strObj = string.Format("<C0><OBJ={0:X8}><A0><S1>{1:.0}<A> %%<S><C>", dwObjectOffset, value3);
 
                         text += strObj;
 
@@ -140,29 +145,14 @@ namespace RTSSDemo
 
                     if (stop)
                     {
-                        return;
+                        break;
                     }
 
                     Thread.Sleep(TimeSpan.FromMilliseconds(500));
-
-                    //if (iteration < 10)
-                    //{
-                    //    iteration++;
-                    //    Thread.Sleep(TimeSpan.FromSeconds(1));
-                    //}
-                    //else
-                    //{
-                    //    var t = Console.ReadLine();
-                    //    if (t == null)
-                    //        break;
-
-                    //    iteration = 0;
-                    //}
-
                 }
             }
 
-            Console.WriteLine("End");
+            Console.WriteLine("End. Press enter.");
             Console.ReadLine();
         }
     }
