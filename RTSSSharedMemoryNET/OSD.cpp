@@ -14,9 +14,10 @@ namespace RTSSSharedMemoryNET {
         if( String::IsNullOrWhiteSpace(entryName) )
             throw gcnew ArgumentException("Entry name cannot be null, empty, or whitespace", "entryName");
 
-        m_entryName = (LPCSTR)Marshal::StringToHGlobalAnsi(entryName).ToPointer();
-        if( strlen(m_entryName) > 255 )
+        if (entryName->Length > 255)
             throw gcnew ArgumentException("Entry name exceeds max length of 255 when converted to ANSI", "entryName");
+
+        m_entryName = (LPCSTR)Marshal::StringToHGlobalAnsi(entryName).ToPointer();
 
         //just open/close to make sure RTSS is working
         HANDLE hMapFile = NULL;
@@ -104,9 +105,10 @@ namespace RTSSSharedMemoryNET {
         if( text == nullptr )
             throw gcnew ArgumentNullException("text");
 
-        LPCSTR lpText = (LPCSTR)Marshal::StringToHGlobalAnsi(text).ToPointer();
-        if( strlen(lpText) > 4095 )
+        if (text->Length > 4095)
             throw gcnew ArgumentException("Text exceeds max length of 4095 when converted to ANSI", "text");
+
+        LPCSTR lpText = (LPCSTR)Marshal::StringToHGlobalAnsi(text).ToPointer();
 
         HANDLE hMapFile = NULL;
         LPRTSS_SHARED_MEMORY pMem = NULL;
