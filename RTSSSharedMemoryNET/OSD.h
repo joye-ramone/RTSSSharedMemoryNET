@@ -47,6 +47,4 @@ namespace RTSSSharedMemoryNET {
 
         static DateTime timeFromTickCount(DWORD ticks);
     };
-
-    LPCWSTR MBtoWC(const char* str);
 }
